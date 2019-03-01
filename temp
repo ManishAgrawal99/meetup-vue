@@ -1,0 +1,132 @@
+.then(key => {
+                const filename = payload.image.name
+                const ext = filename.slice(filename.lastIndexOf('.'))
+                console.log('Image uploaded')
+                return firebase.storage().ref('meetups/' + key + '.' + ext).put(payload.image)
+            })
+            .then(fileData => {
+                imageUrl = fileData.ref.getDownloadURL()
+                //imageUrl = fileData.metadata.downloadURLs[0]
+                console.log(imageUrl)
+                return firebase.database().ref('meetups').child(key).update({imageUrl: imageUrl})
+            })
+            .then(() =>{
+                commit('createMeetup', {
+                    ...meetup,
+                    imageUrl: imageUrl,
+                    id: key
+                })
+            })
+            .catch((err) =>{
+                console.log(err)
+            })
+
+            // We then need to move this data and store it in the firebase
+
+
+
+
+            try{
+                const meetup = {
+                    title: payload.title,
+                    location: payload.location,
+                    description: payload.description,
+                    date: payload.date.toISOString(),
+                    creatorId: getters.user.id,
+                    image: payload.image
+                }
+                //We push the data to the firebase data file which then returns an object with id(key)
+                //We take this key and add it as an id to the meetup object that we had pushed
+                //Now thw meetup obj with the id is stored into the loaded meetups state which is used to load all the meetups 
+                // let imageUrl
+                // let key
+
+                const fbResponse = firebase.database().ref('meetups').push(meetup)
+                console.log(fbResponse)
+                meetup.id = fbResponse.key
+
+                const imgFilename = payload.image.name
+                const imgExt = imgFilename.slice(imgFilename.lastIndexOf("."))
+
+                const imgInfo = firebase.storage().ref(`meetups/${fbResponse.key}.${imgExt}`).put(payload.image)
+                console.log(imgInfo)
+
+                const imagePath = imgInfo.metadata.fullPath
+                const imageUrl = firebase.storage().ref().child(imagePath).getDownloadURL()
+
+                meetup.imageUrl = imageUrl
+
+                const fbUpdateResponse = firebase.database().ref("meetups").child(fbResponse.key).update({ imageUrl: imageUrl })
+
+                console.log(fbUpdateResponse)
+
+                commit('createMeetup',meetup)
+            }
+            catch(error){
+            commit('setLoading',false)
+            commit('setError',error)
+            console.log(error.message)
+        }
+
+
+
+
+uploadTask.on('state_changed', function(snapshot){
+                            // Observe state change events such as progress, pause, and resume
+                            // Get task progress, including the number of bytes uploaded and the total number of bytes to be uploaded
+                            var progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                            console.log('Upload is ' + progress + '% done');
+                            switch (snapshot.state) {
+                                case firebase.storage.TaskState.PAUSED: // or 'paused'
+                                console.log('Upload is paused');
+                                break;
+                                case firebase.storage.TaskState.RUNNING: // or 'running'
+                                console.log('Upload is running');
+                                break;
+                            }
+                        },
+                        function(error) {
+                            console.log(error)
+                        },
+                        function() {
+                            uploadTask.snapshot.ref.getDownloadURL().then(function(downloadURL){
+                                console.log('File available at', downloadURL);
+                            })
+                        }
+
+                        })
+
+
+registerUserForMeetup ({commit, getters},payload) {
+            commit('setLoading', true)
+            const user = getters.user
+            firebase.database().ref('/users/' + user.id).child('/registration/')
+                .push(payload)
+                .then(data =>{
+                    commit('setLoading', false)
+                    commit('registerUserForMeetup', {id: payload.id, fbKey: data.key})
+                    //The payload.id is the id of the mmetup for which the user is registered
+                })
+                .catch(err =>{
+                    console.log(err)
+                    commit('setLoading', false)
+                })
+        },
+        unregisterUserFromMeetup ({commit, getters}, payload) {
+            commit('setLoading', true)
+            const user = getters.user
+            if(!user.fbKeys){
+                return
+            }
+            const fbKey = user.fbKeys[payload]
+            firebase.database().ref('/users/' + user.id + '/registrations/').child(fbKey)
+                .remove()
+                .then(() => {
+                    commit('setLoading', false)
+                    commit('unregisterUserFromMeetup', payload)
+                })
+                .catch(err => {
+                    console.log(err)
+                    commit('setLoading', false)
+                })
+        },
