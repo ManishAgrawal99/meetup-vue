@@ -2,6 +2,13 @@
 
 > A Vue.js project
 
+It is a Single Page Application which gives the user the capability to create new meetups and view the existing ones. 
+The creator of a meetup will get the access to edit the meetup. 
+Others can view and register or unregister from meetup.
+
+The Application is built on
+Vue, Vuetify and Firebase
+
 ## Build Setup
 
 ``` bash
